@@ -1,2 +1,4 @@
 # hello-world
-A beginner checking out this tools.
+A beginner checking out these tools.
+
+This is first Repository!!
