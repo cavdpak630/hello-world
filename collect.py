@@ -2,41 +2,35 @@
 """
 Thesis Pilot Study — Data Collection Script
 
-Run after each session to package a participant's files:
+Run after each session:
   python collect.py
-
-To overwrite an already-existing participant folder:
-  python collect.py --overwrite
 """
 
 import shutil
 import sys
+from datetime import date
 from pathlib import Path
 
 # ── CONFIGURE ONCE ────────────────────────────────────────────────
-# List each source folder and the exact filenames to collect from it.
-# A folder can have more than one file — just add more entries to its "files" list.
 
-SOURCE_FOLDERS = [
-    {
-        "path": r"C:\path\to\folder1",       # ← replace with your actual folder path
-        "files": ["filename1.csv"],           # ← replace with your actual filename(s)
-    },
-    {
-        "path": r"C:\path\to\folder2",       # ← replace with your actual folder path
-        "files": ["filename2.log"],           # ← replace with your actual filename(s)
-    },
-    {
-        "path": r"C:\path\to\folder3",       # ← replace with your actual folder path
-        "files": ["filename3.json"],          # ← replace with your actual filename(s)
-    },
+# Root of your XR pipeline project (where data\ and unity\ live)
+BASE = Path(r"D:\Studies\Thesis\Project Codes\Foot_XR_Pipeline")
+
+# The 3 files collected per participant (relative to BASE)
+PARTICIPANT_FILES = [
+    r"data\live\session_R_562.csv",
+    r"data\live\session_L_561.csv",
+    r"unity\StepSight_Pilot_Test\detected_gestures.csv",
 ]
 
-# Root folder where per-participant sub-folders will be created.
-OUTPUT_ROOT = r"C:\path\to\participants"     # ← replace with your actual output path
+# Where per-participant folders are created
+OUTPUT_ROOT = Path(r"D:\Studies\Thesis\Pilot_Study_Docs\Pilot_Study_Outputs")
+
+# Unity P4_Data: copied entirely into UnityOutputs after every session
+P4_DATA_SRC  = BASE / r"unity\StepSight_Pilot_Test\P4_Data"
+P4_DATA_DEST = OUTPUT_ROOT / "UnityOutputs"
 
 # ──────────────────────────────────────────────────────────────────
-
 
 _INVALID_CHARS = set('/\\:*?"<>|')
 
@@ -57,8 +51,6 @@ def _die(message: str) -> None:
 
 
 def main() -> None:
-    overwrite = "--overwrite" in sys.argv
-
     print()
     print("=" * 60)
     print("   Thesis Pilot Study  —  Data Collection")
@@ -66,46 +58,63 @@ def main() -> None:
 
     pid = _validate_id(input("\n  Participant ID: "))
 
-    output_dir = Path(OUTPUT_ROOT) / pid
+    folder_name = f"{pid}_{date.today().strftime('%Y%m%d')}"
+    output_dir = OUTPUT_ROOT / folder_name
 
-    if output_dir.exists() and not overwrite:
+    if output_dir.exists():
         _die(
-            f"Folder already exists:\n  {output_dir}\n\n"
-            "  Re-run with --overwrite to replace its contents."
+            f"Output folder already exists:\n  {output_dir}\n\n"
+            "  The participant may already have been collected today.\n"
+            "  Rename or remove the existing folder if you need to re-collect."
         )
 
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True)
 
     print(f"\n  Output  →  {output_dir}\n")
-    print(f"  {'STATUS':<7} {'SOURCE FILE'}")
-    print("  " + "-" * 70)
+
+    # ── Participant files ──────────────────────────────────────────
+    print("  Participant files:")
+    print("  " + "-" * 56)
 
     copied = 0
     missing = 0
 
-    for entry in SOURCE_FOLDERS:
-        folder = Path(entry["path"])
-        for filename in entry["files"]:
-            src = folder / filename
-            dest_name = f"{pid}_{filename}"
-            dest = output_dir / dest_name
+    for rel in PARTICIPANT_FILES:
+        src = BASE / rel
+        dest_name = f"{pid}_{src.name}"
+        dest = output_dir / dest_name
 
-            if src.exists():
-                shutil.copy2(src, dest)
-                print(f"  OK      {src}")
-                print(f"          → {dest_name}")
-                copied += 1
-            else:
-                print(f"  MISSING {src}")
-                print(f"          (skipped)")
-                missing += 1
+        if src.exists():
+            shutil.copy2(src, dest)
+            print(f"  OK      {src.name}")
+            print(f"          → {dest_name}")
+            copied += 1
+        else:
+            print(f"  MISSING {src}")
+            missing += 1
 
-    print("  " + "-" * 70)
-    print(f"\n  {copied} file(s) copied, {missing} missing.\n")
+    print("  " + "-" * 56)
+    print(f"  {copied} file(s) copied, {missing} missing.")
 
+    # ── Unity P4_Data ─────────────────────────────────────────────
+    print("\n  Unity P4_Data → UnityOutputs:")
+    print("  " + "-" * 56)
+
+    if not P4_DATA_SRC.exists():
+        print(f"  MISSING {P4_DATA_SRC}")
+        missing += 1
+    else:
+        shutil.copytree(P4_DATA_SRC, P4_DATA_DEST, dirs_exist_ok=True)
+        print(f"  OK      {P4_DATA_SRC.name}  →  {P4_DATA_DEST}")
+
+    print("  " + "-" * 56)
+
+    # ── Summary ───────────────────────────────────────────────────
     if missing:
-        print("  Check the SOURCE_FOLDERS paths and filenames at the top of collect.py.\n")
+        print(f"\n  Done (with {missing} missing file(s)). Check paths at the top of collect.py.\n")
         sys.exit(1)
+    else:
+        print(f"\n  All done!  Folder: {folder_name}\n")
 
 
 if __name__ == "__main__":
